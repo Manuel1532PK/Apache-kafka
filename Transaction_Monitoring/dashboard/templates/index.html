@@ -1,0 +1,91 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Monitor de Transacciones en Tiempo Real</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+        background: #f4f4f4;
+      }
+      h1 {
+        color: #333;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: white;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      }
+      th,
+      td {
+        padding: 10px;
+        text-align: left;
+        border-bottom: 1px solid #ddd;
+      }
+      th {
+        background-color: #2c3e50;
+        color: white;
+      }
+      tr.aceptada {
+        background-color: #d4edda;
+      }
+      tr.rechazada {
+        background-color: #f8d7da;
+      }
+      #status {
+        margin-bottom: 15px;
+        font-weight: bold;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Transacciones Financieras en Tiempo Real</h1>
+    <div id="status">Conectando al stream de decisiones...</div>
+    <table id="tabla-transacciones">
+      <thead>
+        <tr>
+          <th>Fecha/Hora</th>
+          <th>Tipo</th>
+          <th>Monto (USD)</th>
+          <th>Entidad Origen</th>
+          <th>Estado</th>
+        </tr>
+      </thead>
+      <tbody id="cuerpo-tabla">
+        <tr>
+          <td colspan="5">Esperando transacciones...</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <script>
+      const eventSource = new EventSource("/stream");
+      const tbody = document.getElementById("cuerpo-tabla");
+
+      eventSource.onmessage = function (event) {
+        const tx = JSON.parse(event.data);
+        const fecha = new Date(tx.timestamp);
+        const fechaStr = fecha.toLocaleString();
+        const fila = document.createElement("tr");
+        fila.className = tx.estado === "Aceptada" ? "aceptada" : "rechazada";
+        fila.innerHTML = `
+                <td>${fechaStr}</td>
+                <td>${tx.tipo}</td>
+                <td>${tx.monto.toFixed(2)}</td>
+                <td>${tx.entidad_origen}</td>
+                <td>${tx.estado}</td>
+            `;
+        tbody.insertBefore(fila, tbody.firstChild);
+        if (tbody.children.length > 100) tbody.removeChild(tbody.lastChild);
+        document.getElementById("status").innerHTML =
+          "✅ Recibiendo datos en tiempo real";
+      };
+
+      eventSource.onerror = function () {
+        document.getElementById("status").innerHTML =
+          "❌ Error de conexión. Reintentando...";
+      };
+    </script>
+  </body>
+</html>
