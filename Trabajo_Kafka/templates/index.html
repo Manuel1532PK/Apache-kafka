@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard de Transacciones - Kafka</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <style>
+      .aceptada {
+        background-color: #d4edda;
+        color: #155724;
+      }
+      .rechazada {
+        background-color: #f8d7da;
+        color: #721c24;
+      }
+      .pendiente {
+        background-color: #fff3cd;
+        color: #856404;
+      }
+      table {
+        margin-top: 20px;
+      }
+      .btn-sm {
+        margin: 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container mt-4">
+      <h1 class="mb-4">💰 Simulador de Transacciones Bancarias</h1>
+      <p>
+        Las transacciones llegan desde <code>producer_Transfer.py</code>. Puedes
+        aceptar o rechazar cada una.
+      </p>
+      <div class="table-responsive">
+        <table class="table table-bordered table-hover" id="transTable">
+          <thead class="table-dark">
+            <tr>
+              <th>ID</th>
+              <th>Fecha</th>
+              <th>Hora</th>
+              <th>Nombre</th>
+              <th>Entidad</th>
+              <th>Tipo</th>
+              <th>Monto (COP)</th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="transBody">
+            <tr>
+              <td colspan="9" class="text-center">Cargando transacciones...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <script>
+      async function loadTransactions() {
+        const res = await fetch("/api/transactions");
+        const transacciones = await res.json();
+        const tbody = document.getElementById("transBody");
+        tbody.innerHTML = "";
+
+        if (transacciones.length === 0) {
+          tbody.innerHTML =
+            '<tr><td colspan="9" class="text-center">No hay transacciones aún. Esperando productor...</td></tr>';
+          return;
+        }
+
+        transacciones.sort((a, b) =>
+          a.fecha + a.hora > b.fecha + b.hora ? -1 : 1,
+        );
+
+        for (const tx of transacciones) {
+          const row = tbody.insertRow();
+          row.className = tx.estado;
+          row.insertCell(0).innerText = tx.transaction_id;
+          row.insertCell(1).innerText = tx.fecha;
+          row.insertCell(2).innerText = tx.hora;
+          row.insertCell(3).innerText = tx.nombre;
+          row.insertCell(4).innerText = tx.entidad;
+          row.insertCell(5).innerText = tx.tipo;
+          row.insertCell(6).innerText = `$${tx.monto.toLocaleString()}`;
+          row.insertCell(7).innerText = tx.estado.toUpperCase();
+
+          const actionsCell = row.insertCell(8);
+          if (tx.estado === "pendiente") {
+            const btnAccept = document.createElement("button");
+            btnAccept.innerText = "✅ Aceptar";
+            btnAccept.className = "btn btn-success btn-sm me-1";
+            btnAccept.onclick = () => decide(tx.transaction_id, "accept");
+            const btnReject = document.createElement("button");
+            btnReject.innerText = "❌ Rechazar";
+            btnReject.className = "btn btn-danger btn-sm";
+            btnReject.onclick = () => decide(tx.transaction_id, "reject");
+            actionsCell.appendChild(btnAccept);
+            actionsCell.appendChild(btnReject);
+          } else {
+            actionsCell.innerText = "✔️ Procesada";
+          }
+        }
+      }
+
+      async function decide(id, action) {
+        const res = await fetch(`/api/decide/${id}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: action }),
+        });
+        if (res.ok) {
+          loadTransactions(); // recargar tabla
+        } else {
+          const err = await res.json();
+          alert("Error: " + err.error);
+        }
+      }
+
+      setInterval(loadTransactions, 1500);
+      loadTransactions();
+    </script>
+  </body>
+</html>
